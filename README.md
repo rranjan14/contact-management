@@ -10,11 +10,24 @@ A simple contacts management application built with modern web technologies.
 - Dark/light mode support
 - Responsive design for mobile and desktop
 
+## Tech Stack
+
+- **Frontend**: Next.js 15, React 19
+- **UI Components**: shadcn/ui, Tailwind CSS
+- **Database**: Firebase Firestore
+- **State Management**: React Hooks
+- **Form Handling**: React Hook Form
+- **Date Handling**: date-fns
+- **Feedbacks**: Sonner
+- **Styling**: Tailwind CSS with CSS variables for theming
+- **Package Manager**: pnpm
+
 ## Prerequisites
 
 - Node.js (v20 or higher)
 - pnpm package manager
 - Git
+- Firebase account
 
 ## Getting Started
 
