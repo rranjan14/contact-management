@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { uploadPhotoWithProgress } from '@/lib/storage-utils';
+import { logger } from '@/lib/logger';
 import type { Contact } from '@/types/contact';
 import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
@@ -68,7 +69,11 @@ export const CreateContactModal = memo(
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       try {
-        console.log('event.target.files[0] ', e.target?.files?.[0]);
+        logger.info('Processing image upload', {
+          fileName: e.target?.files?.[0]?.name,
+          fileSize: e.target?.files?.[0]?.size,
+        });
+
         if (e.target.files && e.target.files[0]) {
           const file = e.target.files[0];
 
@@ -79,20 +84,42 @@ export const CreateContactModal = memo(
           const reader = new FileReader();
           reader.onload = event => {
             setImagePreview(event.target?.result as string);
+            logger.info('Image preview created successfully');
+          };
+          reader.onerror = error => {
+            logger.error('Error creating image preview', error);
+            toast({
+              title: 'Error processing image',
+              description:
+                'Could not create image preview. Please try another image.',
+              variant: 'destructive',
+            });
           };
           reader.readAsDataURL(file);
         } else {
           // Clear the image if no file is selected
           setValue('image', undefined);
           setImagePreview(null);
+          logger.info('Image selection cleared');
         }
       } catch (err) {
-        console.log('error ', err);
+        logger.error('Error in handleImageChange', err);
+        toast({
+          title: 'Error processing image',
+          description: 'An error occurred while processing the image.',
+          variant: 'destructive',
+        });
       }
     };
 
     // Then modify the onSubmit function to set this state
     const onSubmit = async (data: z.infer<typeof FormSchema>) => {
+      logger.info('Form submission started', {
+        name: data.name,
+        hasImage: !!data.image,
+        lastContactDate: data.lastContactDate?.toISOString(),
+      });
+
       // Zod validation will handle the required fields now
       try {
         let imageUrl = '/placeholder.svg'; // Default image URL
@@ -102,10 +129,21 @@ export const CreateContactModal = memo(
           const image = data.image;
           const path = `contacts/${Date.now()}_${image.name}`;
 
+          logger.info('Starting image upload', {
+            fileName: image.name,
+            fileSize: image.size,
+            path,
+          });
+
           imageUrl = await uploadPhotoWithProgress(image, path, progress => {
             setUploadProgress(progress);
+            if (progress % 25 === 0) {
+              // Log at 0%, 25%, 50%, 75%, 100%
+              logger.info(`Upload progress: ${progress}%`);
+            }
           });
           setIsUploading(false);
+          logger.info('Image upload completed', { imageUrl });
         }
 
         const newContact: Omit<Contact, 'id'> = {
@@ -114,6 +152,11 @@ export const CreateContactModal = memo(
           lastContactDate: new Date(data.lastContactDate),
         };
 
+        logger.info('Contact created successfully', {
+          name: newContact.name,
+          imageUrl: newContact.imageUrl,
+        });
+
         onClose(newContact);
         toast({
           title: 'Contact created successfully',
@@ -121,7 +164,19 @@ export const CreateContactModal = memo(
           variant: 'success',
         });
       } catch (error: unknown) {
-        console.error('Error creating contact:', error);
+        logger.error('Error creating contact', {
+          error,
+          errorMessage:
+            error instanceof Error ? error.message : 'Unknown error',
+          errorStack: error instanceof Error ? error.stack : undefined,
+          formData: {
+            name: data.name,
+            hasImage: !!data.image,
+            imageFileName: data.image?.name,
+            lastContactDate: data.lastContactDate?.toISOString(),
+          },
+        });
+
         setIsUploading(false);
         toast({
           title: 'Error creating contact',

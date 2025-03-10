@@ -12,6 +12,7 @@ import {
 import { db } from '@/lib/firebase';
 import type { Contact } from '@/types/contact';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export function useContacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -22,6 +23,7 @@ export function useContacts() {
    * Fetches contacts from the database.
    */
   const fetchContacts = useCallback(async () => {
+    logger.info('Fetching contacts from database');
     setLoading(true);
     try {
       const contactsRef = collection(db, 'contacts');
@@ -44,9 +46,15 @@ export function useContacts() {
         }
       });
 
+      logger.info(`Successfully fetched ${contactsList.length} contacts`);
       setContacts(contactsList);
     } catch (error) {
-      console.error('Error fetching contacts:', error);
+      logger.error('Error fetching contacts', {
+        error,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorStack: error instanceof Error ? error.stack : undefined,
+      });
+
       toast({
         title: 'Error loading contacts',
         description: 'Failed to load your contacts. Please try again.',
@@ -63,6 +71,11 @@ export function useContacts() {
    */
   const addContact = useCallback(
     async (newContact: Omit<Contact, 'id'>) => {
+      logger.info('Adding new contact', {
+        name: newContact.name,
+        lastContactDate: newContact.lastContactDate.toISOString(),
+      });
+
       try {
         const contactData = {
           name: newContact.name,
@@ -71,6 +84,7 @@ export function useContacts() {
         };
 
         const docRef = await addDoc(collection(db, 'contacts'), contactData);
+        logger.info('Contact added successfully', { contactId: docRef.id });
 
         const createdContact: Contact = {
           id: docRef.id,
@@ -86,7 +100,17 @@ export function useContacts() {
 
         return createdContact;
       } catch (error) {
-        console.error('Error adding contact:', error);
+        logger.error('Error adding contact', {
+          error,
+          errorMessage:
+            error instanceof Error ? error.message : 'Unknown error',
+          errorStack: error instanceof Error ? error.stack : undefined,
+          contactData: {
+            name: newContact.name,
+            lastContactDate: newContact.lastContactDate.toISOString(),
+          },
+        });
+
         toast({
           title: 'Error adding contact',
           description: 'Failed to add the contact. Please try again.',
